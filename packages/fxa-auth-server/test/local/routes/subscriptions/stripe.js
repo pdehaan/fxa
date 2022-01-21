@@ -929,7 +929,7 @@ describe('DirectStripeRoutes', () => {
       );
       sinon.assert.calledOnceWithExactly(
         Sentry.captureMessage,
-        `Cannot find a postal code for customer ${emptyCustomer.id}`,
+        `Cannot find a postal code for customer.`,
         Sentry.Severity.Error
       );
     });
@@ -1204,7 +1204,7 @@ describe('DirectStripeRoutes', () => {
       );
       sinon.assert.calledOnceWithExactly(
         Sentry.captureMessage,
-        `Cannot find a postal code or country for customer ${emptyCustomer.id}`,
+        `Cannot find a postal code or country for customer.`,
         Sentry.Severity.Error
       );
     });

@@ -508,7 +508,7 @@ export class StripeHandler {
             paymentMethodId: paymentMethod?.id,
           });
           Sentry.captureMessage(
-            `Cannot find a postal code for customer ${customer.id}`,
+            `Cannot find a postal code for customer.`,
             Sentry.Severity.Error
           );
         });
@@ -611,7 +611,7 @@ export class StripeHandler {
             paymentMethodId: paymentMethod?.id,
           });
           Sentry.captureMessage(
-            `Cannot find a postal code or country for customer ${customer!.id}`,
+            `Cannot find a postal code or country for customer.`,
             Sentry.Severity.Error
           );
         });
