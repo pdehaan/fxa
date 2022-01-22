@@ -15,10 +15,16 @@ import { MozLoggerService } from 'fxa-shared/nestjs/logger/logger.service';
 import { CurrentUser } from '../../auth/auth-header.decorator';
 import { GqlAuthHeaderGuard } from '../../auth/auth-header.guard';
 import { DatabaseService } from '../../database/database.service';
-import { Account } from 'fxa-shared/db/models/auth';
+import { Account, SessionToken } from 'fxa-shared/db/models/auth';
+import { IConnectedServicesFactoryProvider } from 'fxa-shared/connected-services/IConnectedServicesFactoryProvider';
+import { ConnectedServicesFactory } from 'fxa-shared/connected-services/ConnectedServicesFactory';
+import { ClientFormatter } from 'fxa-shared/connected-services/ClientFormatter';
+import { synthesizeClientNameFromSession } from 'fxa-shared/connected-services/ConnectedServicesUtil';
+import { lookupDevices } from 'fxa-shared/connected-services/db/Devices';
 import { uuidTransformer } from '../../database/transformers';
 import { Account as AccountType } from '../../gql/model/account.model';
 import { Email as EmailType } from '../../gql/model/emails.model';
+import { AttachedSession } from 'fxa-shared/connected-services/models/AttachedSession';
 
 const ACCOUNT_COLUMNS = [
   'uid',
@@ -208,5 +214,67 @@ export class AccountResolver {
       .query()
       .select(SESSIONTOKEN_COLUMNS)
       .where('uid', uidBuffer);
+  }
+
+  @ResolveField()
+  public async attachedClients(@Root() account: Account) {
+    const clientFormatter = new ClientFormatter(
+      account.locale, // TODO: Check if locale will work here
+      [account.locale],
+      account.locale,
+      Date.now(),
+      () => console,
+      (language: string) => {
+        return require(`cldr-localenames-full/main/${language}/territories.json`);
+      }
+    );
+
+    const provider: IConnectedServicesFactoryProvider = {
+      getDeviceList: async () => {
+        // From the admin panel we always want to see the last access time.
+        const lastAccessTimeEnabled = true;
+
+        // Call out to routine in fxa shared and look up devices from
+        // redis cache
+        return await lookupDevices(
+          account.uid,
+          lastAccessTimeEnabled,
+          this.db.redis
+        );
+      },
+      getOAuthClients: async () => {
+        const client = new AuthorizedClientsDB(this.db.authDb);
+        return await client.list(account.uid);
+      },
+      getAttachedSessions: async () => {
+        const sessions = await this.db.sessionTokens
+          .query()
+          .select(SESSIONTOKEN_COLUMNS)
+          .where('uid', uuidTransformer.to(account.uid));
+
+        return sessions.map((x: SessionToken) => {
+          return {
+            id: x.tokenId,
+            createdAt: x.createdAt,
+            lastAccessTime: x.lastAccessTime,
+            uaBrowser: x.uaBrowser,
+            uaOS: x.uaOS,
+            uaBrowserVersion: x.uaBrowserVersion,
+            uaOSVersion: x.uaOSVersion,
+            uaFormFactor: x.uaFormFactor,
+          } as AttachedSession;
+        });
+      },
+      synthesizeClientName(session) {
+        return synthesizeClientNameFromSession(session);
+      },
+      getClientFormatter() {
+        return clientFormatter;
+      },
+    };
+
+    const factory = new ConnectedServicesFactory(provider);
+
+    return await factory.build(account.uid, ['en']);
   }
 }

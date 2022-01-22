@@ -15,6 +15,11 @@ import {
   SessionToken,
   SecurityEvent,
 } from 'fxa-shared/db/models/auth';
+import {
+  RedisBase,
+  Config as RedisConfig,
+  IRedisCache,
+} from 'fxa-shared/db/redis';
 
 function typeCasting(field: any, next: any) {
   if (field.type === 'TINY' && field.length === 1) {
@@ -23,8 +28,36 @@ function typeCasting(field: any, next: any) {
   return next();
 }
 
+export class RedisService extends RedisBase implements IRedisCache {
+  constructor(config: RedisConfig) {
+    super(config);
+  }
+  close(): void {
+    // TODO
+    throw new Error('Method not implemented.');
+  }
+  getSessionTokens(uid: string): Promise<any> {
+    // TODO
+    throw new Error('Method not implemented.');
+  }
+  touchSessionToken(uid: string, token: any): Promise<any> {
+    // TODO
+    throw new Error('Method not implemented.');
+  }
+  pruneSessionTokens(uid: string, tokenIds: any[]): Promise<any> {
+    // TODO
+    throw new Error('Method not implemented.');
+  }
+  del(uid: string): Promise<void> {
+    // TODO
+    throw new Error('Method not implemented.');
+  }
+}
+
 @Injectable()
 export class DatabaseService {
+  public redis: RedisService;
+
   public knex: Knex;
   public account: typeof Account;
   public emails: typeof Email;
@@ -33,6 +66,7 @@ export class DatabaseService {
   public totp: typeof TotpToken;
   public recoveryKeys: typeof RecoveryKey;
   public sessionTokens: typeof SessionToken;
+  public oauthClients: typeof OAuthClients;
 
   constructor(configService: ConfigService<AppConfig>) {
     const dbConfig = configService.get('database') as AppConfig['database'];
@@ -40,6 +74,15 @@ export class DatabaseService {
       connection: { typeCast: typeCasting, ...dbConfig },
       client: 'mysql',
     });
+    const redisConfig = configService.get('redis') as AppConfig['redis'];
+    this.redis = new RedisService({
+      ...redisConfig,
+      keyPrefix: redisConfig.sessionTokens.prefix, // TOOD: Doublecheck, What prefix should be used?
+      maxttl: 1000, // TODO: Double check
+      recordLimit: 100, // TODO: Double check
+      timeoutMs: 1000, // TODO: Double check
+    });
+
     this.account = Account.bindKnex(this.knex);
     this.emails = Email.bindKnex(this.knex);
     this.emailBounces = EmailBounce.bindKnex(this.knex);
@@ -47,6 +90,7 @@ export class DatabaseService {
     this.totp = TotpToken.bindKnex(this.knex);
     this.recoveryKeys = RecoveryKey.bindKnex(this.knex);
     this.sessionTokens = SessionToken.bindKnex(this.knex);
+    this.oauthClients = OAth;
   }
 
   async dbHealthCheck(): Promise<Record<string, any>> {

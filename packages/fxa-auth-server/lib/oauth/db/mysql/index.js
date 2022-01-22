@@ -3,34 +3,16 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 const buf = require('buf').hex;
-const mysql = require('mysql');
 
 const encrypt = require('../../encrypt');
 const ScopeSet = require('fxa-shared').oauth.scopes;
 const unique = require('../../unique');
 const AccessToken = require('../accessToken');
 
+// Shared base class
+const MysqlStore = require('fxa-shared').MysqlStore;
+
 const REQUIRED_SQL_MODES = ['STRICT_ALL_TABLES', 'NO_ENGINE_SUBSTITUTION'];
-const REQUIRED_CHARSET = 'UTF8MB4_UNICODE_CI';
-
-function MysqlStore(options) {
-  if (options.charset && options.charset !== REQUIRED_CHARSET) {
-    throw new Error('You cannot use any charset besides ' + REQUIRED_CHARSET);
-  } else {
-    options.charset = REQUIRED_CHARSET;
-  }
-  options.typeCast = function (field, next) {
-    if (field.type === 'TINY' && field.length === 1) {
-      return field.string() === '1';
-    }
-    return next();
-  };
-  this._pool = mysql.createPool(options);
-}
-
-MysqlStore.connect = async function mysqlConnect(options) {
-  return new MysqlStore(options);
-};
 
 const QUERY_GET_LOCK = 'SELECT GET_LOCK(?, ?) AS acquired';
 const QUERY_CLIENT_REGISTER =

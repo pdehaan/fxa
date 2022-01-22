@@ -4,10 +4,12 @@
 
 const config = require('../../../config');
 const redis = require('../../redis');
+const OauthRedisShared = require('../../../../fxa-shared/connected-services/db/AuthorizedClients');
 
 // These are used only in type declarations.
 // eslint-disable-next-line no-unused-vars
 const AccessToken = require('./accessToken');
+
 // eslint-disable-next-line no-unused-vars
 const RefreshTokenMetadata = require('./refreshTokenMetadata');
 
@@ -20,19 +22,16 @@ const RefreshTokenMetadata = require('./refreshTokenMetadata');
 // refresh-token connections as a single conceptual "oauth redis db", in order
 // to keep the calling code a bit simpler.
 
-class OauthRedis {
+class OauthRedis extends OauthRedisShared {
   constructor() {
-    this.redisAccessTokens = redis({
-      ...config.get('redis.accessTokens'),
-      enabled: true,
-      maxttl: config.get('oauthServer.expiration.accessToken'),
-    });
-    this.redisRefreshTokens = redis(config.get('redis.refreshTokens'));
-  }
-
-  async close() {
-    await this.redisAccessTokens.close();
-    await this.redisRefreshTokens.close();
+    super(
+      redis({
+        ...config.get('redis.accessTokens'),
+        enabled: true,
+        maxttl: config.get('oauthServer.expiration.accessToken'),
+      }),
+      redis(config.get('redis.refreshTokens'))
+    );
   }
 
   /**
@@ -42,15 +41,6 @@ class OauthRedis {
    */
   async getAccessToken(tokenId) {
     return this.redisAccessTokens.getAccessToken(tokenId);
-  }
-
-  /**
-   *
-   * @param {Buffer | string} uid
-   * @return {Promise<AccessToken[]>}
-   */
-  async getAccessTokens(uid) {
-    return this.redisAccessTokens.getAccessTokens(uid);
   }
 
   /**
@@ -99,31 +89,6 @@ class OauthRedis {
   }
 
   /**
-   *
-   * @param {Buffer | string} uid
-   * @param {Buffer | string} tokenId
-   * @return {Promise<RefreshTokenMetadata>}
-   */
-  async getRefreshToken(uid, tokenId) {
-    if (!this.redisRefreshTokens) {
-      return null;
-    }
-    return this.redisRefreshTokens.getRefreshToken(uid, tokenId);
-  }
-
-  /**
-   *
-   * @param {Buffer | string} uid
-   * @return {Promise<{[key: string]: RefreshTokenMetadata}>}
-   */
-  async getRefreshTokens(uid) {
-    if (!this.redisRefreshTokens) {
-      return {};
-    }
-    return this.redisRefreshTokens.getRefreshTokens(uid);
-  }
-
-  /**
    * @param {Buffer | string} uid
    * @param {Buffer | string} tokenId
    * @param {RefreshTokenMetadata} token
@@ -157,18 +122,6 @@ class OauthRedis {
       return null;
     }
     return this.redisRefreshTokens.removeRefreshTokensForUser(uid);
-  }
-
-  /**
-   *
-   * @param {Buffer | string} uid
-   * @param {(Buffer | string)[]} tokenIdsToPrune
-   */
-  pruneRefreshTokens(uid, tokenIdsToPrune) {
-    if (!this.redisRefreshTokens) {
-      return null;
-    }
-    return this.redisRefreshTokens.pruneRefreshTokens(uid, tokenIdsToPrune);
   }
 }
 

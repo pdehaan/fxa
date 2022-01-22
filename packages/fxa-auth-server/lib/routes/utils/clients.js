@@ -4,6 +4,7 @@
 
 'use strict';
 
+// TODO: Refactor to use fxa-shared connected-services/ClientFormatter
 const i18n = require('i18n-abide');
 
 module.exports = (log, config) => {

@@ -6,9 +6,10 @@ const unique = require('../unique');
 const encrypt = require('../encrypt');
 const config = require('../../../config');
 const MAX_TTL = config.get('oauthServer.expiration.accessToken');
-const ScopeSet = require('fxa-shared').oauth.scopes;
 
-class AccessToken {
+const AccessTokenBase = require('fxa-shared').AccessToken;
+
+class AccessToken extends AccessTokenBase {
   constructor(
     tokenId,
     clientId,
@@ -20,66 +21,23 @@ class AccessToken {
     createdAt,
     profileChangedAt,
     expiresAt,
-    token
+    token,
+    type
   ) {
-    /** @type {Buffer} */
-    this.tokenId = tokenId;
-    /** @type {Buffer} */
-    this.clientId = clientId;
-    /** @type {string} */
-    this.name = name;
-    /** @type {boolean} */
-    this.canGrant = canGrant;
-    /** @type {boolean} */
-    this.publicClient = publicClient;
-    /** @type {Buffer} */
-    this.userId = userId;
-    /** @type {ScopeSet} */
-    this.scope = scope;
-    /** @type {Date} */
-    this.createdAt = createdAt;
-    /** @type {number} */
-    this.profileChangedAt = profileChangedAt;
-    /** @type {Date} */
-    this.expiresAt = expiresAt;
-    /** @type {Buffer} this won't be provided unless we're creating a brand new token */
-    this.token = token || null;
-    this.type = 'bearer';
-  }
-
-  get clientCanGrant() {
-    return this.canGrant;
-  }
-
-  get clientName() {
-    return this.name;
-  }
-
-  get ttl() {
-    return this.expiresAt.getTime() - Date.now();
-  }
-
-  get lastAccessTime() {
-    return this.createdAt;
-  }
-
-  /**
-   *
-   * @returns {object}
-   */
-  toJSON() {
-    return {
-      tokenId: this.tokenId.toString('hex'),
-      clientId: this.clientId.toString('hex'),
-      name: this.name,
-      canGrant: this.canGrant,
-      publicClient: this.publicClient,
-      userId: this.userId.toString('hex'),
-      scope: this.scope.toString(),
-      createdAt: this.createdAt.getTime(),
-      profileChangedAt: this.profileChangedAt,
-      expiresAt: this.expiresAt.getTime(),
-    };
+    super(
+      tokenId,
+      clientId,
+      name,
+      canGrant,
+      publicClient,
+      userId,
+      scope,
+      createdAt,
+      profileChangedAt,
+      expiresAt,
+      token,
+      type
+    );
   }
 
   static generate(
@@ -109,54 +67,6 @@ class AccessToken {
       expiresAt || new Date(Date.now() + (ttl * 1000 || MAX_TTL)),
       // This is the one and only time the caller can get at the unhashed token.
       token
-    );
-  }
-
-  /**
-   *
-   * @param {string} string
-   * @returns {AccessToken}
-   */
-  static parse(string) {
-    const json = JSON.parse(string);
-    // We previously wrote the raw token into redis, but are now writing
-    // only the hashed tokenId.
-    let tokenId;
-    if (json.tokenId) {
-      tokenId = Buffer.from(json.tokenId, 'hex');
-    } else {
-      tokenId = encrypt.hash(Buffer.from(json.token, 'hex'));
-    }
-    return new AccessToken(
-      tokenId,
-      Buffer.from(json.clientId, 'hex'),
-      json.name,
-      json.canGrant,
-      json.publicClient,
-      Buffer.from(json.userId, 'hex'),
-      ScopeSet.fromString(json.scope),
-      new Date(json.createdAt),
-      json.profileChangedAt,
-      new Date(json.expiresAt)
-    );
-  }
-
-  /**
-   * @param {any} row
-   * @returns {AccessToken}
-   */
-  static fromMySQL(row) {
-    return new AccessToken(
-      row.tokenId,
-      row.clientId,
-      row.clientName,
-      row.clientCanGrant,
-      row.publicClient,
-      row.userId,
-      ScopeSet.fromString(row.scope),
-      row.createdAt,
-      row.profileChangedAt,
-      row.expiresAt
     );
   }
 }

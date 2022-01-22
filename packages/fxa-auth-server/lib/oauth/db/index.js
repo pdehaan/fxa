@@ -11,6 +11,9 @@ const redis = require('./redis');
 const AccessToken = require('./accessToken');
 const { SHORT_ACCESS_TOKEN_TTL_IN_MS } = require('fxa-shared/oauth/constants');
 const RefreshTokenMetadata = require('./refreshTokenMetadata');
+const {
+  OAuthDbShared,
+} = require('../../../../fxa-shared/connected-services/db/AuthorizedClients');
 
 const JWT_ACCESS_TOKENS_ENABLED = config.get(
   'oauthServer.jwtAccessTokens.enabled'
@@ -33,15 +36,14 @@ const POCKET_IDS = getPocketIds(
   config.get('oauthServer.clientIdToServiceNames')
 );
 
-class OauthDB {
+class OauthDB extends OAuthDbShared {
   constructor() {
-    this.mysql = mysql.connect(config.get('oauthServer.mysql'));
+    super(mysql.connect(config.get('oauthServer.mysql')), redis());
+
     this.mysql.then(async (db) => {
       await preClients();
       await scopes();
     });
-
-    this.redis = redis();
 
     Object.keys(mysql.prototype).forEach((key) => {
       const self = this;
